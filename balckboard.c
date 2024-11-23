@@ -70,15 +70,15 @@ int main(void) {
 
             mvprintw(middleY, middleX, "Press q to quit");
             if (getch() == 'q') {
-                // : Send the quit to the other processes
+                // TODO: Send the quit to the other processes
                 break;
             }
         }
-        // : Receive the data from the keyboard manager process
-        // : Receive the data from the drone dynamics process
-        // : Receive the data from the obstacles process
-        // : Receive the data from the targets generator process
-        // : Receive the data from the watchdog process
+        // TODO: Receive the data from the keyboard manager process
+        // TODO: Receive the data from the drone dynamics process
+        // TODO: Receive the data from the obstacles process
+        // TODO: Receive the data from the targets generator process
+        // TODO: Receive the data from the watchdog process
         refresh_game_screen(xMax, yMax);
     }
     // Close the ncurses window
