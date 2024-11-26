@@ -5,6 +5,8 @@
 #include <sys/wait.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <string.h>
+
 
 void refresh_game_screen(const int xMax, const int yMax) {
     // Clear the inside of the box
@@ -49,7 +51,8 @@ int main(void) {
         if (dup2(pipefd[1], STDOUT_FILENO) == -1) {
             perror("dup2");
             return EXIT_FAILURE;
-        }        close(pipefd[1]);
+        }
+        close(pipefd[1]);
         // The child process will execute the program "./keyboard_manager" with the argument "keyboard_manager" and the pipe
         // If the return value is not 0, then there was an error
         execl("./keyboard_manager", "keyboard_manager", NULL);
@@ -222,7 +225,61 @@ int main(void) {
     refresh_game_screen(xMax, yMax);
     // Refresh the ncurses window to display the changes
     refresh();
-    // Print the top border of the window
+
+    char info[23];
+    snprintf(info, sizeof(info), "o%d,%d", xMax, yMax);
+    if (write(pipefd[1], &info, sizeof(info)) == -1) {
+        perror("write");
+        close(pipefd[0]);
+        close(pipefd[1]);
+        endwin();
+        return EXIT_FAILURE;
+    }
+    memset(info, '\0', sizeof(info));
+
+    int l = 0;
+    while (true) {
+        if (read(pipefd[0], &info, sizeof(info)) == -1) {
+            perror("read");
+            close(pipefd[0]);
+            close(pipefd[1]);
+            endwin();
+            return EXIT_FAILURE;
+        }
+        if (info[0] != 'o' && info[1] != 's') {
+            mvprintw(middleY - 2, middleX, "Ho letto");
+            break;
+        }
+        refresh_game_screen(xMax, yMax);
+        mvprintw(middleY, middleX, "Attendo il generatore di ostacoli %d", l++);
+        refresh();
+        usleep(10000);
+    }
+    while (true) {
+        if (read(pipefd[0], &info, sizeof(info)) == -1) {
+            perror("read");
+            close(pipefd[0]);
+            close(pipefd[1]);
+            endwin();
+            return EXIT_FAILURE;
+        }
+        if (strcmp(info, "oe") == 0)
+            break;
+        if (scanf(info, "o%d,%d", &xMax, &yMax) == 2)
+            mvaddch(middleY, middleX, 'o');
+        else
+            if (write(pipefd[1], &info, sizeof(info)) == -1) {
+                perror("write");
+                close(pipefd[0]);
+                close(pipefd[1]);
+                endwin();
+                return EXIT_FAILURE;
+            }
+    }
+    refresh_game_screen(xMax, yMax);
+    refresh();
+
+
     mvaddch(middleY, middleX-10, '+');
 
     bool game_pause = false;

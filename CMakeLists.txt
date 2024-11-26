@@ -3,4 +3,4 @@ project(Assignmant1 C)
 
 set(CMAKE_C_STANDARD 11)
 
-add_executable(Assignmant1 balckboard.c)
+add_executable(Assignmant1 blackboard.c)
