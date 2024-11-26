@@ -46,12 +46,13 @@ int main(void) {
         // Close the read end of the pipe in the child process
         close(pipefd[0]);
         // Duplicate the write end of the pipe to the standard output
-        dup2(pipefd[1], STDOUT_FILENO);
+        if (dup2(pipefd[1], STDOUT_FILENO) == -1) {
+            perror("dup2");
+            return EXIT_FAILURE;
+        }        close(pipefd[1]);
         // The child process will execute the program "./keyboard_manager" with the argument "keyboard_manager" and the pipe
         // If the return value is not 0, then there was an error
-        execl("./keyboard_manager", "keyboard_manager", (char *)pipefd, NULL);
-        // Duplicate the write end of the pipe to the standard output
-        close(pipefd[1]);
+        execl("./keyboard_manager", "keyboard_manager", NULL);
         // Print an error message if execl failed
         perror("Keyboard manager");
         // Exit the program with a failure status
@@ -65,10 +66,17 @@ int main(void) {
     }
     if (drone_dynamics == 0) {
         // Duplicate the read end of the pipe to the standard input
-        dup2(pipefd[0], STDIN_FILENO);
+        if (dup2(pipefd[0], STDIN_FILENO) == -1) {
+            perror("dup2");
+            return EXIT_FAILURE;
+        }
+        close(pipefd[0]);
         // Duplicate the write end of the pipe to the standard output
-        dup2(pipefd[1], STDOUT_FILENO);
-
+        if (dup2(pipefd[1], STDOUT_FILENO) == -1) {
+            perror("dup2");
+            return EXIT_FAILURE;
+        }
+        close(pipefd[1]);
         execl("./drone_dynamics", "drone_dynamics", NULL);
         close(pipefd[1]);
         perror("Drone dynamics");
@@ -81,8 +89,17 @@ int main(void) {
         return EXIT_FAILURE;
     }
     if (obstacles == 0) {
-        dup2(pipefd[0], STDIN_FILENO);
-        dup2(pipefd[1], STDOUT_FILENO);
+        if (dup2(pipefd[0], STDIN_FILENO) == -1) {
+            perror("dup2");
+            return EXIT_FAILURE;
+        }
+        close(pipefd[0]);
+        // Duplicate the write end of the pipe to the standard output
+        if (dup2(pipefd[1], STDOUT_FILENO) == -1) {
+            perror("dup2");
+            return EXIT_FAILURE;
+        }
+        close(pipefd[1]);
 
         execl("./obstacles", "obstacles", NULL);
         close(pipefd[1]);
@@ -96,8 +113,17 @@ int main(void) {
         return EXIT_FAILURE;
     }
     if (targets_generator == 0) {
-        dup2(pipefd[0], STDIN_FILENO);
-        dup2(pipefd[1], STDOUT_FILENO);
+        if (dup2(pipefd[0], STDIN_FILENO) == -1) {
+            perror("dup2");
+            return EXIT_FAILURE;
+        }
+        close(pipefd[0]);
+        // Duplicate the write end of the pipe to the standard output
+        if (dup2(pipefd[1], STDOUT_FILENO) == -1) {
+            perror("dup2");
+            return EXIT_FAILURE;
+        }
+        close(pipefd[1]);
 
         execl("./targets_generator", "targets_generator", NULL);
         close(pipefd[1]);
@@ -111,8 +137,17 @@ int main(void) {
         return EXIT_FAILURE;
     }
     if (watchdog == 0) {
-        dup2(pipefd[0], STDIN_FILENO);
-        dup2(pipefd[1], STDOUT_FILENO);
+        if (dup2(pipefd[0], STDIN_FILENO) == -1) {
+            perror("dup2");
+            return EXIT_FAILURE;
+        }
+        close(pipefd[0]);
+        // Duplicate the write end of the pipe to the standard output
+        if (dup2(pipefd[1], STDOUT_FILENO) == -1) {
+            perror("dup2");
+            return EXIT_FAILURE;
+        }
+        close(pipefd[1]);
 
         execl("./watchdog", "watchdog", NULL);
         close(pipefd[1]);
@@ -181,22 +216,22 @@ int main(void) {
             endwin();
             return EXIT_SUCCESS;
         }
-        mvprintw(middleY - 3, middleX, "ci sono %d", i++);
         refresh();
         usleep(10000); // Sleep for 0.01 seconds
     } while (pushChar[0] != 'i' || pushChar[1] != 's');
-
     refresh_game_screen(xMax, yMax);
     // Refresh the ncurses window to display the changes
     refresh();
     // Print the top border of the window
     mvaddch(middleY, middleX-10, '+');
 
+    bool game_pause = false;
     while (true) {
         // Wait for the user to press the key 'q'
         mvprintw(0, xMax - 23, " Press p to pause ");
-        if (getch() == 'p') {
+        if (getch() == 'p') { game_pause = !game_pause;}
 
+        if (game_pause) {
             mvprintw(middleY, middleX, "Press q to quit");
             if (getch() == 'q') {
                 // Send the quit to the other processes
@@ -204,6 +239,7 @@ int main(void) {
                 write(pipefd[1], &quitChar, sizeof(quitChar));
                 break;
             }
+            continue;
         }
         // Receive the data from the keyboard manager process
 
@@ -229,5 +265,5 @@ int main(void) {
     waitpid(obstacles, NULL, 0);
     waitpid(targets_generator, NULL, 0);
     waitpid(watchdog, NULL, 0);
-    return 0;
+    return EXIT_SUCCESS;
 }
