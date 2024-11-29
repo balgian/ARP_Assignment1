@@ -49,8 +49,8 @@ cmake_ninja_workdir = /Users/gianmarco/University/AdvancedAndRobotProgramming/As
 
 build cmake_object_order_depends_target_Assignmant1: phony || .
 
-build CMakeFiles/Assignmant1.dir/balckboard.c.o: C_COMPILER__Assignmant1_unscanned_Debug /Users/gianmarco/University/AdvancedAndRobotProgramming/Assignment1/balckboard.c || cmake_object_order_depends_target_Assignmant1
-  DEP_FILE = CMakeFiles/Assignmant1.dir/balckboard.c.o.d
+build CMakeFiles/Assignmant1.dir/blackboard.c.o: C_COMPILER__Assignmant1_unscanned_Debug /Users/gianmarco/University/AdvancedAndRobotProgramming/Assignment1/blackboard.c || cmake_object_order_depends_target_Assignmant1
+  DEP_FILE = CMakeFiles/Assignmant1.dir/blackboard.c.o.d
   FLAGS = -g -std=gnu11 -arch arm64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.1.sdk -fcolor-diagnostics
   OBJECT_DIR = CMakeFiles/Assignmant1.dir
   OBJECT_FILE_DIR = CMakeFiles/Assignmant1.dir
@@ -63,7 +63,7 @@ build CMakeFiles/Assignmant1.dir/balckboard.c.o: C_COMPILER__Assignmant1_unscann
 #############################################
 # Link the executable Assignmant1
 
-build Assignmant1: C_EXECUTABLE_LINKER__Assignmant1_Debug CMakeFiles/Assignmant1.dir/balckboard.c.o
+build Assignmant1: C_EXECUTABLE_LINKER__Assignmant1_Debug CMakeFiles/Assignmant1.dir/blackboard.c.o
   FLAGS = -g -arch arm64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.1.sdk
   OBJECT_DIR = CMakeFiles/Assignmant1.dir
   POST_BUILD = :

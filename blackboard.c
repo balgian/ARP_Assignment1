@@ -24,13 +24,15 @@ void save_game_screen(const int xMax, const int yMax) {
 int main(void) {
 
     // Make a pipe to send/receive data to/from the child processes
-    int pipefd [2];
-    // Create a pipe
-    if (pipe(pipefd) == -1) {
-        // Print an error message if pipe creation failed
-        perror("Pipe");
-        // Exit the program with a failure status
-        return EXIT_FAILURE;
+    int pipefds [5][2];
+    // Create 5 pipes
+    for (int i = 0; i < 5; i++) {
+        if (pipe(pipefds[i]) == -1) {
+            // Print an error message if pipe creation failed
+            perror("Pipe");
+            // Exit the program with a failure status
+            return EXIT_FAILURE;
+        }
     }
 
     // Initialize all processes (drone dynamics; keyboard manager; obstacles; targets generators; watchdog)
@@ -46,13 +48,13 @@ int main(void) {
     }
     if (keyboard_manager == 0) {
         // Close the read end of the pipe in the child process
-        close(pipefd[0]);
+        close(pipefds[0][0]);
         // Duplicate the write end of the pipe to the standard output
-        if (dup2(pipefd[1], STDOUT_FILENO) == -1) {
+        if (dup2(pipefds[0][1], STDOUT_FILENO) == -1) {
             perror("dup2");
             return EXIT_FAILURE;
         }
-        close(pipefd[1]);
+        close(pipefds[0][1]);
         // The child process will execute the program "./keyboard_manager" with the argument "keyboard_manager" and the pipe
         // If the return value is not 0, then there was an error
         execl("./keyboard_manager", "keyboard_manager", NULL);
@@ -62,101 +64,28 @@ int main(void) {
         return EXIT_FAILURE;
     }
 
-    const pid_t drone_dynamics = fork();
-    if (drone_dynamics == -1) {
-        perror("Drone dynamics");
-        return EXIT_FAILURE;
-    }
-    if (drone_dynamics == 0) {
-        // Duplicate the read end of the pipe to the standard input
-        if (dup2(pipefd[0], STDIN_FILENO) == -1) {
-            perror("dup2");
-            return EXIT_FAILURE;
-        }
-        close(pipefd[0]);
-        // Duplicate the write end of the pipe to the standard output
-        if (dup2(pipefd[1], STDOUT_FILENO) == -1) {
-            perror("dup2");
-            return EXIT_FAILURE;
-        }
-        close(pipefd[1]);
-        execl("./drone_dynamics", "drone_dynamics", NULL);
-        close(pipefd[1]);
-        perror("Drone dynamics");
-        return EXIT_FAILURE;
-    }
-
     const pid_t obstacles = fork();
     if (obstacles == -1) {
         perror("Obstacles");
         return EXIT_FAILURE;
     }
     if (obstacles == 0) {
-        if (dup2(pipefd[0], STDIN_FILENO) == -1) {
+        if (dup2(pipefds[2][0], STDIN_FILENO) == -1) {
             perror("dup2");
             return EXIT_FAILURE;
         }
-        close(pipefd[0]);
-        // Duplicate the write end of the pipe to the standard output
-        if (dup2(pipefd[1], STDOUT_FILENO) == -1) {
+        close(pipefds[2][0]);
+        if (dup2(pipefds[2][1], STDOUT_FILENO) == -1) {
             perror("dup2");
             return EXIT_FAILURE;
         }
-        close(pipefd[1]);
+        close(pipefds[2][1]);
 
         execl("./obstacles", "obstacles", NULL);
-        close(pipefd[1]);
         perror("Obstacles");
         return EXIT_FAILURE;
     }
 
-    const pid_t targets_generator = fork();
-    if (targets_generator == -1) {
-        perror("Targets generator");
-        return EXIT_FAILURE;
-    }
-    if (targets_generator == 0) {
-        if (dup2(pipefd[0], STDIN_FILENO) == -1) {
-            perror("dup2");
-            return EXIT_FAILURE;
-        }
-        close(pipefd[0]);
-        // Duplicate the write end of the pipe to the standard output
-        if (dup2(pipefd[1], STDOUT_FILENO) == -1) {
-            perror("dup2");
-            return EXIT_FAILURE;
-        }
-        close(pipefd[1]);
-
-        execl("./targets_generator", "targets_generator", NULL);
-        close(pipefd[1]);
-        perror("Targets generator");
-        return EXIT_FAILURE;
-    }
-
-    const pid_t watchdog = fork();
-    if (watchdog == -1) {
-        perror("Watchdog");
-        return EXIT_FAILURE;
-    }
-    if (watchdog == 0) {
-        if (dup2(pipefd[0], STDIN_FILENO) == -1) {
-            perror("dup2");
-            return EXIT_FAILURE;
-        }
-        close(pipefd[0]);
-        // Duplicate the write end of the pipe to the standard output
-        if (dup2(pipefd[1], STDOUT_FILENO) == -1) {
-            perror("dup2");
-            return EXIT_FAILURE;
-        }
-        close(pipefd[1]);
-
-        execl("./watchdog", "watchdog", NULL);
-        close(pipefd[1]);
-        perror("Watchdog");
-        return EXIT_FAILURE;
-    }
     // Open a new ncurses window
     initscr();
     // Deactivate mouse support
@@ -203,19 +132,17 @@ int main(void) {
     char pushChar[2] = {'\0', '\0'};
     int i = 0;
     do {
-        if (read(pipefd[0], &pushChar, sizeof(pushChar)) == -1) {
+        if (read(pipefds[0][0], &pushChar, sizeof(pushChar)) == -1) {
             perror("read");
-            close(pipefd[0]);
-            close(pipefd[1]);
+            close(pipefds[0][0]);
+            close(pipefds[0][1]);
             endwin();
             return EXIT_FAILURE;
         }
         if (pushChar[0] == 'i' && pushChar[1] == 'q') {
             pushChar[0] = 'w';
             pushChar[1] = 'q';
-            write(pipefd[1], &pushChar, sizeof(pushChar));
-            close(pipefd[0]);
-            close(pipefd[1]);
+            write(pipefds[0][1], &pushChar, sizeof(pushChar));
             endwin();
             return EXIT_SUCCESS;
         }
@@ -228,57 +155,76 @@ int main(void) {
 
     char info[23];
     snprintf(info, sizeof(info), "o%d,%d", xMax, yMax);
-    if (write(pipefd[1], &info, sizeof(info)) == -1) {
+    if (write(pipefds[2][1], &info, sizeof(info)) == -1) {
         perror("write");
-        close(pipefd[0]);
-        close(pipefd[1]);
+        close(pipefds[2][0]);
+        close(pipefds[2][1]);
         endwin();
         return EXIT_FAILURE;
     }
     memset(info, '\0', sizeof(info));
+    usleep(1000); // Sleep for 1 millisecond
 
-    int l = 0;
     while (true) {
-        if (read(pipefd[0], &info, sizeof(info)) == -1) {
+        if (read(pipefds[2][0], &info, sizeof(info)) == -1) {
             perror("read");
-            close(pipefd[0]);
-            close(pipefd[1]);
+            close(pipefds[2][0]);
+            close(pipefds[2][1]);
             endwin();
             return EXIT_FAILURE;
         }
-        if (info[0] != 'o' && info[1] != 's') {
-            mvprintw(middleY - 2, middleX, "Ho letto");
+        if (strcmp(info, "os") == 0) {
+            mvprintw(middleY, middleX, "done1");
+            refresh();
             break;
+        }
+        if (write(pipefds[2][1], &info, sizeof(info)) == -1) {
+            perror("write");
+            close(pipefds[2][0]);
+            close(pipefds[2][1]);
+            endwin();
+            return EXIT_FAILURE;
         }
         refresh_game_screen(xMax, yMax);
-        mvprintw(middleY, middleX, "Attendo il generatore di ostacoli %d", l++);
         refresh();
-        usleep(10000);
+        usleep(1000); // Sleep for 1 millisecond
     }
+
+    // CI SIAMO
+    usleep(100);
+    int x, y;
     while (true) {
-        if (read(pipefd[0], &info, sizeof(info)) == -1) {
+        if (read(pipefds[2][0], &info, sizeof(info)) == -1) {
             perror("read");
-            close(pipefd[0]);
-            close(pipefd[1]);
+            close(pipefds[2][0]);
+            close(pipefds[2][1]);
             endwin();
             return EXIT_FAILURE;
         }
-        if (strcmp(info, "oe") == 0)
+        if (strcmp(info, "oe") == 0) {
+            mvprintw(middleY, middleX, "Done3");
+            refresh();
+            sleep(2);
             break;
-        if (scanf(info, "o%d,%d", &xMax, &yMax) == 2)
-            mvaddch(middleY, middleX, 'o');
-        else
-            if (write(pipefd[1], &info, sizeof(info)) == -1) {
+        }
+        if (scanf(info, "o%d,%d", &x, &y) == 2) {
+            mvaddch(x, y, 'o');
+            mvprintw(middleY, middleX, "Not a problem");
+            refresh();
+        }
+        else {
+            if (write(pipefds[2][1], &info, sizeof(info)) == -1) {
                 perror("write");
-                close(pipefd[0]);
-                close(pipefd[1]);
+                close(pipefds[2][0]);
+                close(pipefds[2][1]);
                 endwin();
                 return EXIT_FAILURE;
             }
+            mvprintw(middleY, middleX, "There is a problem with the obstacle");
+            refresh();
+            usleep(1000);
+        }
     }
-    refresh_game_screen(xMax, yMax);
-    refresh();
-
 
     mvaddch(middleY, middleX-10, '+');
 
@@ -293,7 +239,7 @@ int main(void) {
             if (getch() == 'q') {
                 // Send the quit to the other processes
                 char quitChar = 'q';
-                write(pipefd[1], &quitChar, sizeof(quitChar));
+                write(pipefds[0][1], &quitChar, sizeof(quitChar));
                 break;
             }
             continue;
@@ -309,18 +255,17 @@ int main(void) {
         refresh_game_screen(xMax, yMax);
     }
 
-    // Close the read end of the pipe
-    close(pipefd[0]);
-    // Close the write end of the pipe
-    close(pipefd[1]);
+    for (int j = 0; j < 5; j++) {
+        // Close the read end of the pipe
+        close(pipefds[j][0]);
+        // Close the write end of the pipe
+        close(pipefds[j][1]);
+    }
     // Close the ncurses window
     endwin();
 
     // Wait for all processes to finish
     waitpid(keyboard_manager, NULL, 0);
-    waitpid(drone_dynamics, NULL, 0);
     waitpid(obstacles, NULL, 0);
-    waitpid(targets_generator, NULL, 0);
-    waitpid(watchdog, NULL, 0);
     return EXIT_SUCCESS;
 }
