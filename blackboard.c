@@ -6,7 +6,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <string.h>
-
+#include <fcntl.h> // For O_NONBLOCK
 
 void refresh_game_screen(const int xMax, const int yMax) {
     // Clear the inside of the box
