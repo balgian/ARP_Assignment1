@@ -22,12 +22,12 @@ int main (int argc, char *argv[]) {
     }
     sscanf(info, "%d,%d", &xMax, &yMax);
     snprintf(info, sizeof(info), "s");
-    write(write_fd, info, sizeof(info));
+    write(write_fd, &info, sizeof(info));
   	for (int y = 1; y < yMax-1; y++) {
     	for (int x = 1; x < xMax-5; x++) {
         	if (rand() % 100 < 0.0005) {
                 snprintf(info, sizeof(info), "%d,%d", x, y);
-                if (write(write_fd, info, sizeof(info)) == -1) {
+                if (write(write_fd, &info, sizeof(info)) == -1) {
                     perror("write");
                     return EXIT_FAILURE;
                 }
@@ -35,7 +35,7 @@ int main (int argc, char *argv[]) {
     	}
   	}
 	snprintf(info, sizeof(info), "e");
-  	write(write_fd, info, sizeof(info));
+  	write(write_fd, &info, sizeof(info));
   }
   return EXIT_SUCCESS;
 }
