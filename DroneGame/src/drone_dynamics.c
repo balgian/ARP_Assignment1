@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
-#include <ncurses.h>
 
 int main(int argc, char *argv[]) {
   if (argc < 3) {
@@ -15,7 +14,7 @@ int main(int argc, char *argv[]) {
 
   char info[22];
 
-  // Receive the size of the window
+  // * Receive the size of the window
   int xMax, yMax;
   if (read(read_fd, &info, sizeof(info)) == -1) {
     perror("read");
@@ -69,44 +68,42 @@ int main(int argc, char *argv[]) {
 
   while(1) {
     int x[3], y[3], x_variation, y_variation;
-    char info_drone[] = "%d,%d,%d,%d,%d,%d,%d,%d";
-    if (read(read_fd, &info_drone, sizeof(info_drone)) == -1) {
+    for (int i = 0; i < 3; i++) {
+      if (read(read_fd, &info, sizeof(info)) == -1) {
+        perror("read");
+        return EXIT_FAILURE;
+      }
+      sscanf(info, "%d,%d", &x[i], &y[i]);
+    }
+    if (read(read_fd, &info, sizeof(info)) == -1) {
       perror("read");
       return EXIT_FAILURE;
     }
-    sscanf(info_drone, "%d,%d,%d,%d,%d,%d,%d,%d", &x[0], &y[0], &x[1], &y[1], &x[2], &y[2], &x_variation, &y_variation);
+    sscanf(info, "%d,%d", &x_variation, &y_variation);
 
     // Implementing the equation
     double M = 1.0;      // Mass
     double K = 1.0;      // Viscous coefficient
     double T = 55.0;      // Time interval
 
-    double sumFx = (M * (x[0] + x[2] - 2 * x[1]) / (T * T)) + (K * (x[2] - x[1]) / T);
-    double sumFy = (M * (y[0] + y[2] - 2 * y[1]) / (T * T)) + (K * (y[2] - y[1]) / T);
+    double sumFx = x_variation * ((M * (x[0] + x[2] - 2 * x[1]) / (T * T)) + (K * (x[2] - x[1]) / T));
+    double sumFy = y_variation * ((M * (y[0] + y[2] - 2 * y[1]) / (T * T)) + (K * (y[2] - y[1]) / T));
 
-    // Calculate the acceleration
-    double ax = sumFx / M;
-    double ay = sumFy / M;
+    double accel_x = sumFx / M;
+    double accel_y = sumFy / M;
 
-    // Calculate the velocity change
-    double vx = x_variation * ax * T;
-    double vy = y_variation * ay * T;
+    double velocity_x = accel_x * T;
+    double velocity_y = accel_y * T;
 
-    // Calculate the position change
-    double x_shifts_normalized = vx * T;
-    double y_shifts_normalized = vy * T;
+    int x_shifts = (int)(velocity_x * T) +1;
+    int y_shifts = (int)(velocity_y * T) +1;
 
-    int x_shifts = x_variation;//(int)((x_shifts_normalized);
-    int y_shifts = y_variation;//(int)((y_shifts_normalized);
-
-    char schifts[22];
-    sprintf(schifts, "%d,%d", x_shifts, y_shifts);
-
-    if (write(write_fd, &schifts, sizeof(schifts)) == -1) {
+    sprintf(info, "%d,%d", x_shifts, y_shifts);
+    if (write(write_fd, &info, sizeof(info)) == -1) {
       perror("write");
       return EXIT_FAILURE;
     }
-    usleep(100);
+    usleep(1000);
   }
   return 0;
 }

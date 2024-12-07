@@ -34,34 +34,33 @@ int main (int argc, char *argv[]) {
                 perror("realloc");
                 return EXIT_FAILURE;
             }
-            pos_obst[size] = x_obst;
-            pos_obst[size+1] = y_obst;
-            size += 2;
+            pos_obst[size++] = x_obst;
+            pos_obst[size++] = y_obst;
         }
     } while (strcmp(info, "e") != 0);
 
     // Gives the target positions cheching if they are not in the obstacles positions
     for (int y = 1; y < yMax-1; y++) {
         for (int x = 1; x < xMax-5; x++) {
-            int found = 0;
             for (int i = 0; i < size; i += 2) {
-                if (pos_obst[i] == x && pos_obst[i+1] == y) {
-                    found = 1;
-                    break;
-                }
-            }
-            if (rand() % 100 < 0.0005 && !found) {
-                snprintf(info, sizeof(info), "%d,%d", x, y);
-                if (write(write_fd, info, sizeof(info)) == -1) {
-                    perror("write");
-                    return EXIT_FAILURE;
+                if (pos_obst[i] != x || pos_obst[i] != y) {
+                    if (rand() % 50000 < 1) {
+                        snprintf(info, sizeof(info), "%d,%d", x, y);
+                        if (write(write_fd, info, sizeof(info)) == -1) {
+                            perror("write");
+                            return EXIT_FAILURE;
+                        }
+                    }
                 }
             }
         }
     }
     snprintf(info, sizeof(info), "e");
-    write(write_fd, info, sizeof(info));
-    close(read_fd);
-    close(write_fd);
+    if(write(write_fd, &info, sizeof(info)) == -1) {
+        perror("write");
+        close(read_fd);
+        close(write_fd);
+        return EXIT_FAILURE;
+    }
     return EXIT_SUCCESS;
 }

@@ -1,0 +1,6 @@
+/DroneGame/src/drone_dynamics
+/DroneGame/src/keyboard_manager
+/DroneGame/src/main
+/DroneGame/src/obstacles
+/DroneGame/src/targets_generator
+/DroneGame/src/watchdog
