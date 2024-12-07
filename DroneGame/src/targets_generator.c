@@ -11,10 +11,16 @@ int main (int argc, char *argv[]) {
     int read_fd = atoi(argv[1]);
     int write_fd = atoi(argv[2]);
 
-    // Read the obstacles positions
     int xMax, yMax;
-    int x_obst, y_obst;
     char info[22];
+
+    if (read(read_fd, &info, sizeof(info)) == -1){
+        perror("read");
+        return EXIT_FAILURE;
+    }
+    sscanf(info, "%d,%d", &xMax, &yMax);
+
+    int x_obst, y_obst;
     int *pos_obst = NULL;
     int size = 0;
     do {
@@ -35,34 +41,27 @@ int main (int argc, char *argv[]) {
     } while (strcmp(info, "e") != 0);
 
     // Gives the target positions cheching if they are not in the obstacles positions
-    while(1){
-        if (read(read_fd, &info, sizeof(info)) == -1){
-            perror("read");
-            return EXIT_FAILURE;
-        }
-        sscanf(info, "%d,%d", &xMax, &yMax);
-        snprintf(info, sizeof(info), "s");
-        write(write_fd, info, sizeof(info));
-        for (int y = 1; y < yMax-1; y++) {
-            for (int x = 1; x < xMax-5; x++) {
-                int found = 0;
-                for (int i = 0; i < size; i += 2) {
-                    if (pos_obst[i] == x && pos_obst[i+1] == y) {
-                        found = 1;
-                        break;
-                    }
+    for (int y = 1; y < yMax-1; y++) {
+        for (int x = 1; x < xMax-5; x++) {
+            int found = 0;
+            for (int i = 0; i < size; i += 2) {
+                if (pos_obst[i] == x && pos_obst[i+1] == y) {
+                    found = 1;
+                    break;
                 }
-                if (rand() % 100 < 0.0005 && !found) {
-                    snprintf(info, sizeof(info), "%d,%d", x, y);
-                    if (write(write_fd, info, sizeof(info)) == -1) {
-                        perror("write");
-                        return EXIT_FAILURE;
-                    }
+            }
+            if (rand() % 100 < 0.0005 && !found) {
+                snprintf(info, sizeof(info), "%d,%d", x, y);
+                if (write(write_fd, info, sizeof(info)) == -1) {
+                    perror("write");
+                    return EXIT_FAILURE;
                 }
             }
         }
-        snprintf(info, sizeof(info), "e");
-        write(write_fd, info, sizeof(info));
     }
+    snprintf(info, sizeof(info), "e");
+    write(write_fd, info, sizeof(info));
+    close(read_fd);
+    close(write_fd);
     return EXIT_SUCCESS;
 }

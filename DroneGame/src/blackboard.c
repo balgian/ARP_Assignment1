@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <string.h>
 #include <fcntl.h>
+#include <sys/select.h>
 
 void refresh_game_screen(const int xMax, const int yMax) {
     // Clear the inside of the box
@@ -14,41 +15,25 @@ void refresh_game_screen(const int xMax, const int yMax) {
             mvaddch(y, x, ' ');
         }
     }
-}
-
-void save_game_screen(const int xMax, const int yMax) {
-
+    refresh();
 }
 
 int main(void) {
-    // Open a new ncurses window
-    initscr();
-    // Deactivate mouse support
-    mousemask(0, NULL);
-    // Delete the echo of the keys
-    noecho();
-    // Delete the cursor highlight
-    curs_set(0);
 
-    // Create a border around the whole window
-    // Get the maximum x and y coordinates of the window
-    int xMax, yMax;
-    getmaxyx(stdscr, yMax, xMax);
-
-    // Make a pipe to send/receive data to/from the child processes
+  	// * Make the pipes with child processes, and if an error occurs:
+        // * - Print an error message if pipe creation failed;
+        // * - Exit the program with a failure status.
     int pipefds[5][2];
-    // Create 5 pipes
     for (int i = 0; i < 5; i++) {
         if (pipe(pipefds[i]) == -1) {
-            // Print an error message if pipe creation failed
             perror("Pipe");
-            // Exit the program with a failure status
             return EXIT_FAILURE;
         }
     }
-    // Create 5 child processes
+
+  	// * Fork five child processes.
     pid_t pid[5];
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 5; i++) {
         pid[i] = fork();
         if (pid[i] == -1) {
             perror("Fork");
@@ -57,92 +42,117 @@ int main(void) {
         if (pid[i] == 0) {
             char read_pipe_str[10];
             char write_pipe_str[10];
-
             sprintf(read_pipe_str, "%d", pipefds[i][0]);
             sprintf(write_pipe_str, "%d", pipefds[i][1]);
 
-            if (i == 0) {
-                execl("./keyboard_manager", "keyboard_manager", read_pipe_str, write_pipe_str, NULL);
-                perror("Keyboard Manager");
-            }
-            if (i == 1) {
-                execl("./obstacles", "obstacles", read_pipe_str, write_pipe_str, NULL);
-                perror("Keyboard Manager");
-            }
-            if (i == 2) {
-                execl("./targets_generator", "targets_generator", read_pipe_str, write_pipe_str, NULL);
-                perror("Keyboard Manager");
-            }
-            if (i == 3) {
-                execl("./drone_dynamics", "drone_dynamics", read_pipe_str, write_pipe_str, NULL);
-                perror("Keyboard Manager");
-            }
+            if (i == 0) execl("./keyboard_manager", "keyboard_manager", read_pipe_str, write_pipe_str, NULL);
+            if (i == 1) execl("./obstacles", "obstacles", read_pipe_str, write_pipe_str, NULL);
+            if (i == 2) execl("./targets_generator", "targets_generator", read_pipe_str, write_pipe_str, NULL);
+            if (i == 3) execl("./drone_dynamics", "drone_dynamics", read_pipe_str, write_pipe_str, NULL);
+            if (i == 4) execl("./watchdog", "watchdog", read_pipe_str, write_pipe_str, NULL);
+
+            perror("execl");
             return EXIT_FAILURE;
         }
     }
-    // Print the top border of the window
+
+    // * Setting up `select`.
+    fd_set readfds;
+    int max_fd = 0;
+    for (int i = 0; i < 5; i++) {
+        if (pipefds[i][0] > max_fd) {
+            max_fd = pipefds[i][0];
+        }
+    }
+
+  	// * Initialization and setup of the map:
+    	// * - Open a new ncurses window;
+        // * - Deactivate mouse support;
+        // * - Delete the echo of the keys;
+        // * - Delete the cursor highlight.
+    initscr();
+    mousemask(0, NULL);
+    noecho();
+    curs_set(0);
+
+    // * Create a border around the whole window:
+    	// * - Get the maximum x and y coordinates of the window;
+    	// * - Print the top border of the window:
+    		// * - Place the string '-' at the top of the window at the current x coordinate;
+    		// * - Place the string '-' at the bottom of the window at the current x coordinate.
+    	// * - Print the sides of the window:
+    		// * - Place the string '|' at the left of the window at the current y coordinate;
+    		// * - Place the string '|' at the right of the window at the current y coordinate.
+    	// * - Print the corners of the window:
+    		// * - Top left;
+    		// * - Top right;
+    		// * - Bottom left;
+    		// * - Bottom right.
+    int xMax, yMax;
+    getmaxyx(stdscr, yMax, xMax);
     for (int i = 0; i < xMax-5; i++) {
-        // Place the string '-' at the top of the window at the current x coordinate
         mvaddch(0, i, '-');
-        // Place the string '-' at the bottom of the window at the current x coordinate
         mvaddch(yMax-1, i, '-');
     }
-    // Print the sides of the window
     for (int i = 1; i < yMax-1; i++) {
-        // Place the string '|' at the left of the window at the current y coordinate
         mvaddch(i, 0, '|');
-        // Place the string '|' at the right of the window at the current y coordinate
         mvaddch(i, xMax-5, '|');
     }
-    // Print the corners of the window
-    // Top left
     mvaddch(0, 0, '+');
-    // Top right
     mvaddch(0, xMax-5, '+');
-    // Bottom left
     mvaddch(yMax-1, 0, '+');
-    // Bottom right
     mvaddch(yMax-1, xMax-5, '+');
-    // Write the string "Push s to start" at the centre of the window
+
+    // * Write the strings "Push s to start" and
+    // * "Press q to quit" in the middle of the window
     int middleX = (xMax-5)/2;
     int middleY = (yMax - 1)/2;
     mvprintw(middleY, middleX, "Press s to start");
     mvprintw(middleY + 1, middleX, "Press q to quit");
-    // Refresh the ncurses window to display the changes
     refresh();
 
-    // Wait for the user to press the key 's'
+    // * Wait for the user to press the key 's'
     char pushChar = '\0';
     while (pushChar != 's') {
-        if (read(pipefds[0][0], &pushChar, sizeof(pushChar)) == -1) {
-            perror("read");
-            close(pipefds[0][0]);
-            close(pipefds[0][1]);
-            endwin();
-            return EXIT_FAILURE;
+      	FD_ZERO(&readfds);
+      	FD_SET(pipefds[0][0], &readfds);
+
+   		if (select(pipefds[0][0] + 1, &readfds, NULL, NULL, NULL) > 0) {
+            if (FD_ISSET(pipefds[0][0], &readfds)) {
+                if (read(pipefds[0][0], &pushChar, sizeof(pushChar)) == -1) {
+                    perror("read");
+                    close(pipefds[0][0]);
+                    close(pipefds[0][1]);
+                    endwin();
+                    return EXIT_FAILURE;
+                }
+            }
         }
         if (pushChar == 'q') {
             // TODO: implement the watchdog signlal
-            // Write to the watchdog
-            // write(pipefds[5][1], &pushChar, sizeof(pushChar));
             endwin();
             return EXIT_SUCCESS;
         }
-        refresh();
-        usleep(1000);
     }
     refresh_game_screen(xMax, yMax);
-    // Refresh the ncurses window to display the changes
-    refresh();
-    usleep(10000);
 
-    // Send the size of the window to the obstacles process
+    // * Send the size of the window to the child processes:
+    // * - 'obstacles';
+    // * - 'targets_generator';
+    // * - 'drone dynamics'
     char info[22];
     snprintf(info, sizeof(info), "%d,%d", xMax, yMax);
     if (write(pipefds[1][1], &info, sizeof(info)) == -1) {
         perror("write");
         close(pipefds[1][0]);
         close(pipefds[1][1]);
+        endwin();
+        return EXIT_FAILURE;
+    }
+    if (write(pipefds[2][1], &info, sizeof(info)) == -1) {
+        perror("write");
+        close(pipefds[2][0]);
+        close(pipefds[2][1]);
         endwin();
         return EXIT_FAILURE;
     }
@@ -153,31 +163,26 @@ int main(void) {
         endwin();
         return EXIT_FAILURE;
     }
-    memset(info, '\0', sizeof(info));
-    usleep(1000);
-
-    // Read the obstacles positions and send it to the target
-    // generator process
-    do {
-        if (read(pipefds[1][0], &info, sizeof(info)) == -1) {
-            perror("read");
-            close(pipefds[1][0]);
-            close(pipefds[1][1]);
-            endwin();
-            return EXIT_FAILURE;
-        }
-    } while (strcmp(info, "s") != 0);
 
     int x = 0;
     int y = 0;
+    // * Insert the obstacoles in the map and send their position to the child
+    // * processes: 'targets_generator' and 'drone dynamics'
     do {
-        if (read(pipefds[1][0], &info, sizeof(info)) == -1) {
-            perror("read");
-            close(pipefds[1][0]);
-            close(pipefds[1][1]);
-            endwin();
-            return EXIT_FAILURE;
+        FD_ZERO(&readfds);
+        FD_SET(pipefds[1][0], &readfds);
+        if (select(pipefds[1][0] + 1, &readfds, NULL, NULL, NULL) > 0) {
+            if (FD_ISSET(pipefds[1][0], &readfds)) {
+                if (read(pipefds[1][0], &info, sizeof(info)) == -1) {
+                    perror("read");
+                    close(pipefds[1][0]);
+                    close(pipefds[1][1]);
+                    endwin();
+                    return EXIT_FAILURE;
+                }
+            }
         }
+
         if (sscanf(info, "%d,%d", &x, &y) == 2) {
             if (write(pipefds[2][1], &info, sizeof(info)) == -1) {
                 perror("write");
@@ -197,9 +202,10 @@ int main(void) {
             refresh();
         }
     } while (strcmp(info, "e") != 0);
+    refresh();
 
-    // Send the end message to the target generator and
-    // drone dynamic processes
+    // * Send the end message to the: 'target generator' and
+    // * 'drone dynamic' child processes
     if (write(pipefds[2][1], &info, sizeof(info)) == -1) {
         perror("write");
         close(pipefds[2][0]);
@@ -215,48 +221,39 @@ int main(void) {
         return EXIT_FAILURE;
     }
 
-    // ! Change the position of this part of the code
-    // Send the size of the window to the target generator process
-    snprintf(info, sizeof(info), "%d,%d", xMax, yMax);
-    if (write(pipefds[2][1], &info, sizeof(info)) == -1) {
-        perror("write");
-        close(pipefds[2][0]);
-        close(pipefds[2][1]);
-        endwin();
-        return EXIT_FAILURE;
-    }
-    memset(info, '\0', sizeof(info));
-
-    // Read the targets positions and send it to the drone dynamics process
+    // * Insert the targets and send their positon to the child
+    // * process 'drone dynamics' process
     int num_target = 0;
     do {
-        if (read(pipefds[2][0], &info, sizeof(info)) == -1) {
+
+      FD_ZERO(&readfds);
+      FD_SET(pipefds[2][0], &readfds);
+      if (select(pipefds[2][0] + 1, &readfds, NULL, NULL, NULL) > 0) {
+        if (FD_ISSET(pipefds[2][0], &readfds)) {
+          if (read(pipefds[2][0], &info, sizeof(info)) == -1) {
             perror("read");
             close(pipefds[2][0]);
             close(pipefds[2][1]);
             endwin();
             return EXIT_FAILURE;
+          }
         }
-        if (sscanf(info, "%d,%d", &x, &y) == 2) {
-            if (write(pipefds[3][1], &info, sizeof(info)) == -1) {
-                perror("write");
-                close(pipefds[3][0]);
-                close(pipefds[3][1]);
-                endwin();
-                return EXIT_FAILURE;
-            }
-            if (write(pipefds[3][1], &info, sizeof(info)) == -1) {
-        perror("write");
-        close(pipefds[3][0]);
-        close(pipefds[3][1]);
-        endwin();
-        return EXIT_FAILURE;
-    }
-            mvprintw(y, x, "%d", num_target++);
-            refresh();
-        }
-    } while (strcmp(info, "e") != 0);
+      }
 
+      if (sscanf(info, "%d,%d", &x, &y) == 2) {
+        if (write(pipefds[3][1], &info, sizeof(info)) == -1) {
+          perror("write");
+          close(pipefds[3][0]);
+          close(pipefds[3][1]);
+          endwin();
+          return EXIT_FAILURE;
+        }
+        mvprintw(y, x, "%d", num_target++);
+      }
+    } while (strcmp(info, "e") != 0);
+    refresh();
+
+    // * Send the end message to the 'drone dynamic' child process
     if (write(pipefds[3][1], &info, sizeof(info)) == -1) {
         perror("write");
         close(pipefds[3][0]);
@@ -265,6 +262,7 @@ int main(void) {
         return EXIT_FAILURE;
     }
 
+    // * Print "Press p to pause" in the top right corner of the screen
     mvprintw(0, xMax - 23, " Press p to pause ");
     refresh();
 
@@ -284,6 +282,7 @@ int main(void) {
     mvaddch(y, x, '+');
     refresh();
 
+    /*
     // Sets the keyboard manager's pipe to non-blocking mode
     int flags = fcntl(pipefds[0][0], F_GETFL);
     if (flags == -1) {
@@ -401,7 +400,7 @@ int main(void) {
         drone_positions[3] = drone_positions[5];
         drone_positions[5] = y;
     } while (c != 'q' || game_pause == false);
-
+     */
     for (int i = 0; i < 5; i++) {
         // Close the read end of the pipe
         close(pipefds[i][0]);
