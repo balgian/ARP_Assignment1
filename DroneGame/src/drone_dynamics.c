@@ -95,8 +95,8 @@ int main(int argc, char *argv[]) {
     double velocity_x = accel_x * T;
     double velocity_y = accel_y * T;
 
-    int x_shifts = (int)(velocity_x * T) +1;
-    int y_shifts = (int)(velocity_y * T) +1;
+    int x_shifts = x_variation;
+    int y_shifts = y_variation;
 
     sprintf(info, "%d,%d", x_shifts, y_shifts);
     if (write(write_fd, &info, sizeof(info)) == -1) {
