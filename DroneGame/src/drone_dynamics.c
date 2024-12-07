@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
+#include <ncurses.h>
 
 int main(int argc, char *argv[]) {
   if (argc < 3) {
@@ -14,7 +15,8 @@ int main(int argc, char *argv[]) {
 
   char info[22];
 
-  int  xMax, yMax;
+  // Receive the size of the window
+  int xMax, yMax;
   if (read(read_fd, &info, sizeof(info)) == -1) {
     perror("read");
     close(read_fd);
@@ -23,6 +25,7 @@ int main(int argc, char *argv[]) {
   }
   sscanf(info, "%d,%d", &xMax, &yMax);
 
+  // Receive the obstacles positions
   int x_obst, y_obst;
   int *pos_obst = NULL;
   int size = 0;
@@ -43,6 +46,7 @@ int main(int argc, char *argv[]) {
     }
   } while (strcmp(info, "e") != 0);
 
+  // Receive the targets positions
   int x_targ, y_targ;
   int *pos_targ = NULL;
   size = 0;
@@ -65,12 +69,13 @@ int main(int argc, char *argv[]) {
 
   while(1) {
     int x[3], y[3], x_variation, y_variation;
-    char info_drone[64];
+    char info_drone[] = "%d,%d,%d,%d,%d,%d,%d,%d";
     if (read(read_fd, &info_drone, sizeof(info_drone)) == -1) {
       perror("read");
       return EXIT_FAILURE;
     }
-    sscanf(info, "%d,%d,%d,%d,%d,%d,%d,%d", &x[0], &x[1], &x[2], &y[0], &y[1], &y[2], &x_variation, &y_variation);
+    sscanf(info_drone, "%d,%d,%d,%d,%d,%d,%d,%d", &x[0], &y[0], &x[1], &y[1], &x[2], &y[2], &x_variation, &y_variation);
+
     // Implementing the equation
     double M = 1.0;      // Mass
     double K = 1.0;      // Viscous coefficient
@@ -91,17 +96,17 @@ int main(int argc, char *argv[]) {
     double x_shifts_normalized = vx * T;
     double y_shifts_normalized = vy * T;
 
-    int x_shifts = (int)x_shifts_normalized;
-    int y_shifts = (int)y_shifts_normalized;
+    int x_shifts = x_variation;//(int)((x_shifts_normalized);
+    int y_shifts = y_variation;//(int)((y_shifts_normalized);
 
-    char schifts[64];
+    char schifts[22];
     sprintf(schifts, "%d,%d", x_shifts, y_shifts);
-    if (write(write_fd, &schifts, strlen(schifts)) == -1) {
+
+    if (write(write_fd, &schifts, sizeof(schifts)) == -1) {
       perror("write");
       return EXIT_FAILURE;
     }
-
-    usleep(1000);
+    usleep(100);
   }
   return 0;
 }

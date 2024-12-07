@@ -146,10 +146,18 @@ int main(void) {
         endwin();
         return EXIT_FAILURE;
     }
+    if (write(pipefds[3][1], &info, sizeof(info)) == -1) {
+        perror("write");
+        close(pipefds[3][0]);
+        close(pipefds[3][1]);
+        endwin();
+        return EXIT_FAILURE;
+    }
     memset(info, '\0', sizeof(info));
     usleep(1000);
 
-    // Read the obstacles positions and send it to the target generator process
+    // Read the obstacles positions and send it to the target
+    // generator process
     do {
         if (read(pipefds[1][0], &info, sizeof(info)) == -1) {
             perror("read");
@@ -190,7 +198,8 @@ int main(void) {
         }
     } while (strcmp(info, "e") != 0);
 
-    // Send the end message to the target generator process
+    // Send the end message to the target generator and
+    // drone dynamic processes
     if (write(pipefds[2][1], &info, sizeof(info)) == -1) {
         perror("write");
         close(pipefds[2][0]);
@@ -198,6 +207,15 @@ int main(void) {
         endwin();
         return EXIT_FAILURE;
     }
+    if (write(pipefds[3][1], &info, sizeof(info)) == -1) {
+        perror("write");
+        close(pipefds[3][0]);
+        close(pipefds[3][1]);
+        endwin();
+        return EXIT_FAILURE;
+    }
+
+    // ! Change the position of this part of the code
     // Send the size of the window to the target generator process
     snprintf(info, sizeof(info), "%d,%d", xMax, yMax);
     if (write(pipefds[2][1], &info, sizeof(info)) == -1) {
@@ -208,7 +226,6 @@ int main(void) {
         return EXIT_FAILURE;
     }
     memset(info, '\0', sizeof(info));
-    usleep(1000);
 
     // Read the targets positions and send it to the drone dynamics process
     int num_target = 0;
@@ -228,10 +245,25 @@ int main(void) {
                 endwin();
                 return EXIT_FAILURE;
             }
+            if (write(pipefds[3][1], &info, sizeof(info)) == -1) {
+        perror("write");
+        close(pipefds[3][0]);
+        close(pipefds[3][1]);
+        endwin();
+        return EXIT_FAILURE;
+    }
             mvprintw(y, x, "%d", num_target++);
             refresh();
         }
     } while (strcmp(info, "e") != 0);
+
+    if (write(pipefds[3][1], &info, sizeof(info)) == -1) {
+        perror("write");
+        close(pipefds[3][0]);
+        close(pipefds[3][1]);
+        endwin();
+        return EXIT_FAILURE;
+    }
 
     mvprintw(0, xMax - 23, " Press p to pause ");
     refresh();
@@ -252,17 +284,6 @@ int main(void) {
     mvaddch(y, x, '+');
     refresh();
 
-    sscanf(info, "%d,%d", &xMax, &yMax);
-    if (write(pipefds[3][1], &info, sizeof(info)) == -1) {
-        perror("write");
-        close(pipefds[3][0]);
-        close(pipefds[3][1]);
-        endwin();
-        return EXIT_FAILURE;
-    }
-    memset(info, '\0', sizeof(info));
-    usleep(1000);
-
     // Sets the keyboard manager's pipe to non-blocking mode
     int flags = fcntl(pipefds[0][0], F_GETFL);
     if (flags == -1) {
@@ -282,7 +303,7 @@ int main(void) {
 
     int drone_positions[6] = { x, y, x, y, x, y };
     int variance[2] = { 0, 0 };
-    
+
     char c;
     bool game_pause = false;
     do {
@@ -294,39 +315,42 @@ int main(void) {
                     break;
                 case 'e': // Up
                     variance[1]--;
-                break;
+                	break;
                 case 'r': // Up Right or Reset
                     variance[1]--;
                     variance[0]++;
                     break;
                 case 's': // Left or Suspend
                     variance[0]--;
-                break;
+                	break;
                 case 'd': // Breake
+                  	variance[0] = 0;
+                   	variance[1] = 0;
                     break;
                 case 'f': // Right
                     variance[0]++;
-                break;
+                	break;
                 case 'x': // Down Left
                     variance[1]++;
-                variance[0]--;
-                break;
+                	variance[0]--;
+                	break;
                 case 'c': // Down
                     variance[1]++;
-                break;
+                	break;
                 case 'v': // Down Right
                     variance[1]++;
-                variance[0]++;
-                break;
+                	variance[0]++;
+                	break;
                 case 'p': // Pause
                     game_pause = !game_pause;
-                break;
+                	break;
                 case 'q': // Quit
                     break;
                 default:
                     break;
             }
         }
+
         char info_drone[64];
         sprintf(info_drone, "%d,%d,%d,%d,%d,%d,%d,%d", drone_positions[0], drone_positions[1], drone_positions[2],
             drone_positions[3], drone_positions[4], drone_positions[5], variance[0], variance[1]);
@@ -339,11 +363,11 @@ int main(void) {
             return EXIT_FAILURE;
         }
         memset(info_drone, '\0', sizeof(info));
-        usleep(1000);
-        
+        usleep(100);
+
         mvprintw(3, xMax - 23, " %s", info_drone);
         refresh();
-        char shifts_drone[64];
+        char shifts_drone[22];
         int shifts[2] = { 0, 0 };
         if (read(pipefds[3][0], &shifts_drone, sizeof(shifts_drone)) == -1) {
             perror("read");
@@ -352,26 +376,22 @@ int main(void) {
             endwin();
             return EXIT_FAILURE;
         }
-        sscanf(shifts_drone, "%d,%d,0,0,0,0,0,0", &shifts[0], &shifts[1]);
-        memset(shifts_drone, '\0', sizeof(info));
+        int x_tmp, y_tmp;
+        if (sscanf(shifts_drone, "%d,%d", &x_tmp, &y_tmp) == 2) {
+            shifts[0] = x_tmp;
+            shifts[1] = y_tmp;
+        }
 
-        mvprintw(3, xMax - 23, " DONE3");
-        refresh();
-        int shifts_abs[] = {abs(shifts[0]), abs(shifts[1])};
         int shifts_sign[] = {shifts[0] >= 0 ? 1 : -1, shifts[1] >= 0 ? 1 : -1};
-
-        int max = shifts[0] > shifts[1] ? shifts[0] : shifts[1];
-
-        mvprintw(0, xMax - 23, "%d,%d", shifts[0], shifts[1]);
-        refresh();
+        int max = abs(shifts[0]) > abs(shifts[1]) ? abs(shifts[0]) : abs(shifts[1]);
 
         for (int i = 0; i < max; i++) {
             mvaddch(y, x, ' ');
-            x = x + (shifts_abs[0] != 0 ? shifts_sign[0] : 0);
-            y = y + (shifts_abs[1] != 0 ? shifts_sign[1] : 0);
+            x = x + (shifts[0] != 0 ? shifts_sign[0] : 0);
+            y = y + (shifts[1] != 0 ? shifts_sign[1] : 0);
             mvaddch(y, x, '+');
             refresh();
-            usleep(1000);
+            usleep(30000);
         }
 
         drone_positions[0] = drone_positions[2];
