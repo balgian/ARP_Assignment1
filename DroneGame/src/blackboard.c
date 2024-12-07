@@ -352,6 +352,7 @@ int main(void) {
           break;
         }
       }
+      /*
       for (int i = 0; i < 5; i = i + 2) {
         sprintf(info, "%d,%d", drone_positions[i], drone_positions[i+1]);
         if (write(pipefds[3][1], &info, sizeof(info)) == -1){
@@ -362,6 +363,7 @@ int main(void) {
           return EXIT_FAILURE;
         }
       }
+
       sprintf(info, "%d,%d", variance[0], variance[1]);
       if (write(pipefds[3][1], &info, sizeof(info)) == -1){
         perror("write");
@@ -370,7 +372,6 @@ int main(void) {
         endwin();
         return EXIT_FAILURE;
       }
-      usleep(100);
 
       int x_shifts = 0;
       int y_shifts = 0;
@@ -391,7 +392,9 @@ int main(void) {
 
       mvprintw(0, 5, "x_shifts: %d y_shifts: %d", x_shifts, y_shifts);
       refresh();
-
+       */
+      int x_shifts = variance[0];
+      int y_shifts = variance[1];
       int x_step = (x_shifts > 0) ? 1 : -1;
       int y_step = (y_shifts > 0) ? 1 : -1;
 
@@ -406,8 +409,10 @@ int main(void) {
         }
         mvaddch(y, x, '+');
         refresh();
-        usleep(100);
+        usleep(50000);
       }
+      mvprintw(0, 5, "x: %d y: %d", x, y);
+      refresh();
       drone_positions[0] = drone_positions[2];
       drone_positions[2] = drone_positions[4];
       drone_positions[4] = x;
