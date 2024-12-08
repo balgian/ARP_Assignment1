@@ -388,6 +388,7 @@ int main(void) {
       int y_shifts = 0;
       FD_ZERO(&readfds);
       FD_SET(pipefds[3][0], &readfds);
+
       if (select(pipefds[3][0] + 1, &readfds, NULL, NULL, NULL) > 0) {
         if (FD_ISSET(pipefds[3][0], &readfds)) {
           if (read(pipefds[3][0], &info, sizeof(info)) == -1) {
@@ -407,10 +408,14 @@ int main(void) {
       int max_shifts = abs(x_shifts) > abs(y_shifts) ? abs(x_shifts) : abs(y_shifts);
       for (int i = 0; i < max_shifts; i++) {
         mvaddch(y, x, ' ');
-        if (i < abs(x_shifts)) {
+        if (i < abs(x_shifts) && i < abs(y_shifts)) {
+          x += x_step;
+          y += y_step;
+        }
+        else if (i < abs(x_shifts)) {
           x += x_step;
         }
-        if (i < abs(y_shifts)) {
+        else if (i < abs(y_shifts)) {
           y += y_step;
         }
         mvaddch(y, x, '+');
@@ -421,7 +426,7 @@ int main(void) {
       drone_positions[2] = x;
       drone_positions[1] = drone_positions[3];
       drone_positions[3] = y;
-      usleep(13000);
+      usleep(8333);
     } while (c != 'q' || game_pause == 0);
 
     for (int i = 0; i < 5; i++) {

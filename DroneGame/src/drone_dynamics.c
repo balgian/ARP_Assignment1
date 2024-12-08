@@ -79,6 +79,7 @@ int main(int argc, char *argv[]) {
           return EXIT_FAILURE;
         }
         i--;
+        continue;
       }
       if (i == 2) {
           sscanf(info, "%d,%d", &x_variation, &y_variation);
@@ -92,9 +93,15 @@ int main(int argc, char *argv[]) {
     double K = 1.0;      // Viscous coefficient
     double T = 0.00833;      // Time interval
 
-    double sumFx =  (M * (x[0] + (x[1] + x_variation) - 2 * x[1]) / (T * T)) + (K * ((x[1] + x_variation) - x[1]) / T);
-    double sumFy = (M * (y[0] + (y[1] + y_variation) - 2 * y[1]) / (T * T)) + (K * ((y[1] + y_variation) - y[1]) / T);
+    double DroneFx =  (M * (x[0] + (x[1] + x_variation) - 2 * x[1]) / (T * T)) + (K * ((x[1] + x_variation) - x[1]) / T);
+    double DroneFy = (M * (y[0] + (y[1] + y_variation) - 2 * y[1]) / (T * T)) + (K * ((y[1] + y_variation) - y[1]) / T);
 
+    // TODO: Add the repulsive force (for obstacles) and acctractive force (for targets) with Kakib force
+
+    double sumFx = DroneFx + obstFx + targFx;
+    double sumFy = DroneFy + obstFy + targFy;
+
+    // * Compute the acceleration from the total force
     double accel_x = sumFx / M;
     double accel_y = sumFy / M;
 
