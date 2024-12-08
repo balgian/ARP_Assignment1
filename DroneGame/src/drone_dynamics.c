@@ -66,28 +66,34 @@ int main(int argc, char *argv[]) {
     }
   } while (strcmp(info, "e") != 0);
 
+  int x[2], y[2], x_variation, y_variation;
   while(1) {
-    int x[3], y[3], x_variation, y_variation;
-    for (int i = 0; i < 3; i++) {
+    for (int i = -1; i < 3; i++) {
       if (read(read_fd, &info, sizeof(info)) == -1) {
         perror("read");
         return EXIT_FAILURE;
       }
+      if (i == -1 && strcmp(info, "s") != 0) {
+        if (write(write_fd, &info, sizeof(info)) == -1) {
+          perror("write");
+          return EXIT_FAILURE;
+        }
+        i--;
+      }
+      if (i == 2) {
+          sscanf(info, "%d,%d", &x_variation, &y_variation);
+          continue;
+      }
       sscanf(info, "%d,%d", &x[i], &y[i]);
     }
-    if (read(read_fd, &info, sizeof(info)) == -1) {
-      perror("read");
-      return EXIT_FAILURE;
-    }
-    sscanf(info, "%d,%d", &x_variation, &y_variation);
 
     // Implementing the equation
     double M = 1.0;      // Mass
     double K = 1.0;      // Viscous coefficient
-    double T = 55.0;      // Time interval
+    double T = 0.00833;      // Time interval
 
-    double sumFx = x_variation * ((M * (x[0] + x[2] - 2 * x[1]) / (T * T)) + (K * (x[2] - x[1]) / T));
-    double sumFy = y_variation * ((M * (y[0] + y[2] - 2 * y[1]) / (T * T)) + (K * (y[2] - y[1]) / T));
+    double sumFx =  (M * (x[0] + (x[1] + x_variation) - 2 * x[1]) / (T * T)) + (K * ((x[1] + x_variation) - x[1]) / T);
+    double sumFy = (M * (y[0] + (y[1] + y_variation) - 2 * y[1]) / (T * T)) + (K * ((y[1] + y_variation) - y[1]) / T);
 
     double accel_x = sumFx / M;
     double accel_y = sumFy / M;
@@ -95,15 +101,14 @@ int main(int argc, char *argv[]) {
     double velocity_x = accel_x * T;
     double velocity_y = accel_y * T;
 
-    int x_shifts = x_variation;
-    int y_shifts = y_variation;
+    int x_shifts = (int)(velocity_x * T);
+    int y_shifts = (int)(velocity_y * T);
 
     sprintf(info, "%d,%d", x_shifts, y_shifts);
     if (write(write_fd, &info, sizeof(info)) == -1) {
       perror("write");
       return EXIT_FAILURE;
     }
-    usleep(1000);
   }
   return 0;
 }
